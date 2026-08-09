@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Biased Coin Desk — Kelly Criterion Simulator with Risk:Reward</title>
+<meta name="description" content="An interactive Kelly criterion sandbox built on the Haghani &amp; Dewey biased-coin study, extended with variable risk-to-reward ratios, a calendar time axis and a thousand-lifetime ruin test.">
+<meta name="theme-color" content="#07090a">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Biased Coin Desk — Kelly Criterion Simulator">
+<meta property="og:description" content="A 60% coin still bankrupted a third of finance students. Find out why bet sizing, not edge, is what ruins people.">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+:root{
+  --bg:#07090a;
+  --panel:#0d1211;
+  --panel-2:#111917;
+  --rule:#1d2724;
+  --rule-hi:#2b3a35;
+  --ink:#d6e2dd;
+  --ink-dim:#6d7f79;
+  --ink-faint:#465450;
+  --up:#46d19a;
+  --up-dim:#2a7f5f;
+  --down:#e0554b;
+  --warn:#d9a441;
+  --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--mono);
+  font-size:13px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  padding:18px;
+}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+
+/* ---------- masthead ---------- */
+.masthead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--rule)}
+.masthead h1{font-size:14px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;margin:0}
+.masthead .sub{color:var(--ink-faint);font-size:11px;letter-spacing:.08em}
+.masthead .spacer{flex:1}
+.preset{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ---------- panels ---------- */
+.deck{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:14px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:14px}
+.eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px}
+.eyebrow .val{color:var(--up);letter-spacing:.06em}
+
+/* ---------- coin ---------- */
+.coinstage{display:flex;flex-direction:column;align-items:center;gap:12px;padding:6px 0 16px}
+.rig-line{font-size:12px;color:var(--ink-dim);text-align:center}
+.rig-line b{color:var(--up);font-weight:600}
+.coin{width:132px;height:132px;perspective:700px}
+.coin-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.3,.8,.3,1)}
+.coin.spin .coin-inner{transition:transform .42s cubic-bezier(.25,.9,.3,1)}
+.face{
+  position:absolute;inset:0;border-radius:50%;backface-visibility:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-size:38px;font-weight:600;letter-spacing:.06em;
+  background:radial-gradient(circle at 34% 28%, #4a5a55 0%, #24302c 46%, #101815 100%);
+  border:1px solid #33423d;
+  box-shadow:inset 0 0 22px rgba(0,0,0,.75), 0 6px 20px rgba(0,0,0,.5);
+  color:#9fb3ac;
+}
+.face.t{transform:rotateY(180deg)}
+.face small{position:absolute;bottom:22px;font-size:8px;letter-spacing:.24em;color:var(--ink-faint);font-weight:400}
+
+/* ---------- readout rows ---------- */
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;background:var(--panel-2);border:1px solid var(--rule);border-radius:4px;margin-bottom:7px}
+.row .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim)}
+.row .v{font-size:16px;font-variant-numeric:tabular-nums}
+.v.up{color:var(--up)} .v.down{color:var(--down)} .v.warn{color:var(--warn)}
+
+/* ---------- ticket ---------- */
+.ticket{border:1px solid var(--rule-hi);border-radius:5px;padding:11px;background:var(--panel-2);margin-bottom:9px}
+.ticket .leg{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:var(--ink-dim)}
+.ticket .leg span:last-child{font-variant-numeric:tabular-nums;color:var(--ink)}
+.ticket .leg.win span:last-child{color:var(--up)}
+.ticket .leg.lose span:last-child{color:var(--down)}
+.bar{display:flex;height:9px;border-radius:2px;overflow:hidden;margin:9px 0 4px;background:#0a100e}
+.bar .risk{background:var(--down);opacity:.85}
+.bar .rew{background:var(--up);opacity:.85}
+.barlab{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.1em;color:var(--ink-faint);text-transform:uppercase}
+
+/* ---------- controls ---------- */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px}
+button,select,input[type=number],input[type=text]{font-family:var(--mono);font-size:12px}
+.btn{
+  background:transparent;border:1px solid var(--rule-hi);color:var(--ink-dim);
+  padding:9px 10px;border-radius:4px;cursor:pointer;letter-spacing:.12em;text-transform:uppercase;font-size:11px;
+  transition:background .12s,color .12s,border-color .12s;
+}
+.btn:hover{border-color:var(--up-dim);color:var(--ink)}
+.btn.on{background:rgba(70,209,154,.11);border-color:var(--up);color:var(--up)}
+.btn.primary{background:var(--up-dim);border-color:var(--up-dim);color:#04120c;font-weight:600;width:100%}
+.btn.primary:hover{background:var(--up);border-color:var(--up)}
+.btn.ghost{width:100%}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--up);outline-offset:2px}
+
+.field{display:flex;align-items:center;gap:8px;margin:9px 0}
+.field label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);white-space:nowrap}
+.field .grow{flex:1}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:var(--rule-hi);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--ink);cursor:pointer;border:2px solid var(--bg)}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--ink);cursor:pointer;border:2px solid var(--bg)}
+input[type=number],select{
+  background:var(--panel-2);border:1px solid var(--rule-hi);color:var(--ink);
+  padding:6px 8px;border-radius:3px;font-variant-numeric:tabular-nums;
+}
+input[type=number]{width:74px;text-align:right}
+select{width:100%}
+.num-inline{width:64px}
+
+.result{text-align:center;font-size:12px;padding:8px 4px;min-height:32px;letter-spacing:.04em}
+.result.win{color:var(--up)} .result.lose{color:var(--down)} .result.idle{color:var(--ink-faint)}
+
+/* ---------- charts ---------- */
+.chartbox{margin-bottom:16px}
+.chartbox:last-child{margin-bottom:0}
+.chart{width:100%;height:190px;display:block}
+.chart.short{height:120px}
+.chart.curve{height:180px}
+.chead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.chead .eyebrow{margin:0}
+.chead .spacer{flex:1}
+.minilab{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+input.mini{
+  background:var(--panel-2);border:1px solid var(--rule-hi);color:var(--up);
+  padding:4px 6px;border-radius:3px;font-family:var(--mono);font-size:11px;
+  font-variant-numeric:tabular-nums;width:62px;text-align:right;
+}
+input.mini[type=date]{width:126px;color:var(--ink-dim);text-align:left}
+input.mini::-webkit-calendar-picker-indicator{filter:invert(.6) sepia(.4) saturate(3) hue-rotate(100deg);cursor:pointer}
+
+/* ---------- kelly block ---------- */
+.kelly{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin-top:10px}
+.kcell{background:var(--panel-2);border:1px solid var(--rule);border-radius:4px;padding:9px 10px}
+.kcell .k{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+.kcell .v{font-size:17px;font-variant-numeric:tabular-nums;margin-top:2px}
+.kcell.flag{border-color:var(--down)}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.stat{background:var(--panel);padding:9px 11px}
+.stat .k{font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint)}
+.stat .v{font-size:14px;font-variant-numeric:tabular-nums;margin-top:2px}
+
+/* ---------- monte carlo ---------- */
+.mc-grid{display:grid;grid-template-columns:1fr minmax(260px,320px);gap:16px;align-items:start}
+.mc-controls{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td{padding:5px 0;border-bottom:1px solid var(--rule)}
+td:first-child{color:var(--ink-dim);font-size:10px;letter-spacing:.11em;text-transform:uppercase}
+td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+
+/* ---------- end-of-run slip ---------- */
+.overlay{
+  position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:rgba(4,6,6,.82);backdrop-filter:blur(3px);
+  animation:fade .25s ease both;
+}
+.overlay[hidden]{display:none}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.slip{
+  width:min(520px,100%);background:var(--panel);border:1px solid var(--rule-hi);
+  border-top:2px solid var(--up);border-radius:6px;padding:22px;
+  box-shadow:0 24px 70px rgba(0,0,0,.65);
+  animation:rise .3s cubic-bezier(.2,.8,.3,1) both;
+}
+.slip.bust{border-top-color:var(--down)}
+.slip-head{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:12px;border-bottom:1px solid var(--rule)}
+.slip h2{font-size:22px;line-height:1.25;letter-spacing:-.01em;margin:16px 0 0;font-weight:600;color:var(--up)}
+.slip.bust h2{color:var(--down)}
+.slip-sub{font-size:12px;color:var(--ink-dim);margin:8px 0 0;line-height:1.55}
+.slip-nums{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin:16px 0 0}
+.slip-nums div{background:var(--panel-2);padding:8px 10px}
+.slip-nums .k{font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint)}
+.slip-nums .v{font-size:15px;font-variant-numeric:tabular-nums;margin-top:1px;color:var(--ink)}
+.slip-note{margin:14px 0 0;padding-left:10px;border-left:2px solid var(--rule-hi)}
+.slip-btns{display:flex;gap:8px;margin-top:18px}
+.slip-btns .btn{flex:1;width:auto}
+
+/* ---------- keys ---------- */
+.keys{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:var(--ink-faint);letter-spacing:.06em}
+kbd{background:var(--panel-2);border:1px solid var(--rule-hi);border-radius:3px;padding:2px 6px;color:var(--ink-dim);font-family:var(--mono);font-size:10px}
+.note{font-size:11px;color:var(--ink-faint);line-height:1.6}
+.note b{color:var(--ink-dim);font-weight:500}
+
+@media (max-width:900px){
+  .deck{grid-template-columns:1fr}
+  .mc-grid{grid-template-columns:1fr}
+  body{padding:12px}
+}
+@media (prefers-reduced-motion: reduce){
+  .coin-inner,.coin.spin .coin-inner{transition:none}
+  .btn{transition:none}
+  .overlay,.slip{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <h1>Biased Coin Desk</h1>
+    <span class="sub">Kelly sizing with variable risk:reward</span>
+    <span class="spacer"></span>
+    <div class="preset">
+      <button class="btn" data-preset="study">Haghani–Dewey 2016</button>
+      <button class="btn" data-preset="longshot">Long shot 30% @ 1:4</button>
+      <button class="btn" data-preset="grind">Grind 78% @ 1:0.4</button>
+    </div>
+  </div>
+
+  <div class="deck">
+
+    <!-- ============ LEFT: the ticket ============ -->
+    <div class="panel">
+      <div class="coinstage">
+        <div class="rig-line">Heads lands <b id="rigTxt">60.0%</b> of the time.</div>
+        <div class="coin" id="coin">
+          <div class="coin-inner" id="coinInner">
+            <div class="face h">H<small>Heads</small></div>
+            <div class="face t">T<small>Tails</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <span class="k"><label for="initNum">Starting balance</label></span>
+        <span style="display:flex;align-items:center;gap:5px"><span class="v" style="color:var(--ink-dim);font-size:14px">$</span><input type="number" id="initNum" min="1" step="25" value="25" style="width:104px;font-size:15px"></span>
+      </div>
+      <div class="row"><span class="k">Bankroll</span><span class="v up" id="bankroll">$25.00</span></div>
+
+      <div class="ticket">
+        <div class="leg"><span>Stake at risk</span><span id="riskAmt">$5.00</span></div>
+        <div class="leg win"><span>Win pays</span><span id="rewAmt">+$5.00</span></div>
+        <div class="leg lose"><span>Loss costs</span><span id="lossAmt">−$5.00</span></div>
+        <div class="bar"><div class="risk" id="barRisk" style="width:50%"></div><div class="rew" id="barRew" style="width:50%"></div></div>
+        <div class="barlab"><span>Risk 1</span><span id="rrLabel">Reward 1.00</span></div>
+      </div>
+
+      <div class="seg">
+        <button class="btn on" id="sideHeads">Heads</button>
+        <button class="btn" id="sideTails">Tails</button>
+      </div>
+
+      <button class="btn primary" id="flipBtn">Flip once</button>
+      <div class="result idle" id="result">Pick a side, size the bet, flip.</div>
+
+      <div class="field">
+        <label for="modeSel">Sizing</label>
+        <select id="modeSel" class="grow">
+          <option value="fraction">Fixed fraction of bankroll</option>
+          <option value="kelly">Full Kelly</option>
+          <option value="half">Half Kelly</option>
+          <option value="quarter">Quarter Kelly</option>
+          <option value="dollar">Fixed dollar stake</option>
+          <option value="martingale">Martingale (double on loss)</option>
+        </select>
+      </div>
+
+      <div class="field" id="fracField">
+        <label for="fracRange">Risk %</label>
+        <input type="range" id="fracRange" class="grow" min="0" max="100" step="0.5" value="20">
+        <input type="number" id="fracNum" class="num-inline" min="0" max="100" step="0.5" value="20">
+      </div>
+
+      <div class="field" id="dollarField" style="display:none">
+        <label for="dollarNum">Stake $</label>
+        <input type="number" id="dollarNum" class="grow" min="0.01" step="1" value="5">
+      </div>
+
+      <div class="field">
+        <label for="speedRange">Speed</label>
+        <input type="range" id="speedRange" class="grow" min="1" max="60" step="1" value="12">
+        <span class="k" id="speedTxt" style="width:56px;text-align:right">12/s</span>
+      </div>
+
+      <div class="seg">
+        <button class="btn" id="playBtn">Auto-flip</button>
+        <button class="btn" id="resetBtn">Reset run</button>
+      </div>
+
+      <div class="keys" style="margin-top:12px">
+        <span><kbd>Space</kbd> flip</span>
+        <span><kbd>Enter</kbd> auto-flip</span>
+        <span><kbd>H</kbd>/<kbd>T</kbd> side</span>
+      </div>
+    </div>
+
+    <!-- ============ RIGHT: the tape ============ -->
+    <div class="panel">
+      <div class="chartbox">
+        <div class="chead">
+          <p class="eyebrow">Bankroll over time · <span class="val" id="tradeCount">0</span> trades · through <span class="val" id="throughDate">—</span></p>
+          <span class="spacer"></span>
+          <label class="minilab" for="startDate">Start</label>
+          <input type="date" id="startDate" class="mini">
+          <label class="minilab" for="tpdNum">Trades/day</label>
+          <input type="number" id="tpdNum" class="mini" min="0.1" max="500" step="1" value="10">
+          <button class="btn" id="logBtn" style="padding:4px 9px">Log scale</button>
+        </div>
+        <canvas class="chart" id="bkChart"></canvas>
+      </div>
+
+      <div class="chartbox">
+        <p class="eyebrow">Volatility · rolling 20-trade σ</p>
+        <canvas class="chart short" id="volChart"></canvas>
+      </div>
+
+      <div class="field">
+        <label for="rigRange">Heads rigging</label>
+        <input type="range" id="rigRange" class="grow" min="0" max="100" step="0.5" value="60">
+        <input type="number" id="rigNum" class="num-inline" min="0" max="100" step="0.5" value="60">
+      </div>
+
+      <div class="field">
+        <label for="rrRange">Risk : reward</label>
+        <input type="range" id="rrRange" class="grow" min="0.1" max="10" step="0.1" value="1">
+        <input type="number" id="rrNum" class="num-inline" min="0.05" max="100" step="0.1" value="1">
+      </div>
+
+      <div class="kelly">
+        <div class="kcell"><div class="k">Win probability</div><div class="v" id="pwinCell">60.0%</div></div>
+        <div class="kcell"><div class="k">Edge per $1 risked</div><div class="v" id="edgeCell">+$0.20</div></div>
+        <div class="kcell" id="kellyCell"><div class="k">Kelly optimal risk</div><div class="v up" id="kellyVal">20.0%</div></div>
+        <div class="kcell"><div class="k">Growth per trade</div><div class="v" id="growthCell">+2.04%</div></div>
+        <div class="kcell"><div class="k">Growth per day</div><div class="v" id="growthDayCell">+22.6%</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SIGNATURE: growth curve ============ -->
+  <div class="panel">
+    <div class="chead">
+      <p class="eyebrow">Growth rate by bet size · where your slider sits on the curve</p>
+    </div>
+    <canvas class="chart curve" id="curveChart"></canvas>
+    <p class="note" style="margin:8px 0 0" id="curveNote"></p>
+  </div>
+
+  <!-- ============ STATS ============ -->
+  <div class="stats">
+    <div class="stat"><div class="k">Trades</div><div class="v" id="sFlips">0</div></div>
+    <div class="stat"><div class="k">Days elapsed</div><div class="v" id="sDays">0</div></div>
+    <div class="stat"><div class="k">Win rate</div><div class="v" id="sWin">—</div></div>
+    <div class="stat"><div class="k">Peak</div><div class="v" id="sPeak">$25.00</div></div>
+    <div class="stat"><div class="k">Max drawdown</div><div class="v" id="sDD">0.0%</div></div>
+    <div class="stat"><div class="k">Longest losing streak</div><div class="v" id="sStreak">0</div></div>
+    <div class="stat"><div class="k">Return</div><div class="v" id="sRet">0.0%</div></div>
+    <div class="stat"><div class="k">Status</div><div class="v" id="sStatus">Live</div></div>
+  </div>
+
+  <!-- ============ MONTE CARLO ============ -->
+  <div class="panel">
+    <p class="eyebrow">Thousand-lifetime test · same settings, run to completion</p>
+    <div class="mc-controls">
+      <div class="field" style="margin:0"><label for="mcRuns">Runs</label><input type="number" id="mcRuns" value="1000" min="100" max="20000" step="100"></div>
+      <div class="field" style="margin:0"><label for="mcFlips">Trades each</label><input type="number" id="mcFlips" value="300" min="10" max="5000" step="10"><span class="k" id="mcDays" style="color:var(--ink-faint)">= 30 days</span></div>
+      <div class="field" style="margin:0"><label for="mcRuin">Ruin line %</label><input type="number" id="mcRuin" value="1" min="0.01" max="90" step="0.5"></div>
+      <button class="btn" id="mcBtn">Run simulation</button>
+    </div>
+    <div class="mc-grid">
+      <div>
+        <canvas class="chart" id="mcChart"></canvas>
+        <p class="note" style="margin:8px 0 0">Each bar is a bucket of final bankrolls, scaled against where you started. The bar left of the break is everyone who fell through the ruin line.</p>
+      </div>
+      <div>
+        <table id="mcTable">
+          <tr><td>Busted</td><td id="mcBust">—</td></tr>
+          <tr><td>Ended below start</td><td id="mcLoss">—</td></tr>
+          <tr><td>Median finish</td><td id="mcMed">—</td></tr>
+          <tr><td>Mean finish</td><td id="mcMean">—</td></tr>
+          <tr><td>5th percentile</td><td id="mcP5">—</td></tr>
+          <tr><td>95th percentile</td><td id="mcP95">—</td></tr>
+          <tr><td>Best run</td><td id="mcMax">—</td></tr>
+        </table>
+        <p class="note" style="margin:12px 0 0" id="mcNote">
+          Haghani &amp; Dewey gave 61 finance students $25 and a coin that landed heads 60% of the time. About a third still went broke. The bet was never the problem — the sizing was.
+        </p>
+      </div>
+    </div>
+  </div>
+  <!-- ============ END-OF-RUN SLIP ============ -->
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle" hidden>
+    <div class="slip" id="slip">
+      <div class="slip-head">
+        <span id="ovTag">Milestone</span>
+        <span id="ovDate">—</span>
+      </div>
+      <h2 id="ovTitle">—</h2>
+      <p class="slip-sub" id="ovSub">—</p>
+      <div class="slip-nums" id="ovNums"></div>
+      <p class="note slip-note" id="ovNote">—</p>
+      <div class="slip-btns">
+        <button class="btn" id="ovContinue">Keep trading</button>
+        <button class="btn primary" id="ovReset">New run</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ========== state ========== */
+var INIT = 25;
+var S = {
+  bankroll: INIT, initial: INIT,
+  p: 0.60,            // P(heads)
+  rr: 1.0,            // reward per 1 unit risked (net odds b)
+  side: "heads",
+  frac: 0.20,         // fixed-fraction risk
+  dollar: 5,
+  mode: "fraction",
+  history: [INIT],
+  rets: [],
+  vol: [],
+  flips: 0, wins: 0,
+  peak: INIT, maxDD: 0,
+  streak: 0, worstStreak: 0,
+  busted: false, hitBillion: false, billionAt: null,
+  martBase: null, martStake: null,
+  logScale: false,
+  running: false, speed: 12
+};
+S.tpd = 10;                       // trades per day
+S.start = new Date(); S.start.setHours(0,0,0,0);
+var RUIN_FRAC = 0.01;   // bust when bankroll < 1% of start
+
+/* ---- calendar ---- */
+var DAY = 86400000;
+function dayIndex(i){ return Math.floor(i / Math.max(0.01, S.tpd)); }
+function dateAt(i){ return new Date(S.start.getTime() + dayIndex(i) * DAY); }
+function spanDays(){ return dayIndex(Math.max(0, S.history.length - 1)); }
+function fmtDate(d, longSpan){
+  var mm = d.getMonth() + 1, dd = d.getDate(), yy = String(d.getFullYear()).slice(-2);
+  return longSpan ? (mm + "/" + yy) : (mm + "/" + dd);
+}
+function fmtDateFull(d){
+  var M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return M[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+}
+function toInputDate(d){
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+/* ========== helpers ========== */
+function $(id){ return document.getElementById(id); }
+function pWin(){ return S.side === "heads" ? S.p : 1 - S.p; }
+function edge(){ return pWin() * S.rr - (1 - pWin()); }        // EV per $1 risked
+function kelly(){
+  var p = pWin(), b = S.rr;
+  if (b <= 0) return 0;
+  return (p * b - (1 - p)) / b;
+}
+function growth(f){                                            // log growth per flip
+  var p = pWin(), q = 1 - p, b = S.rr;
+  if (f <= 0) return 0;
+  if (f >= 1) return -Infinity;
+  return p * Math.log(1 + f * b) + q * Math.log(1 - f);
+}
+function money(v){
+  var neg = v < 0; v = Math.abs(v);
+  return (neg ? "−$" : "$") + v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function compact(v){
+  var a = Math.abs(v);
+  if (a >= 1e12) return "$" + (v/1e12).toFixed(1) + "T";
+  if (a >= 1e9)  return "$" + (v/1e9).toFixed(1) + "B";
+  if (a >= 1e6)  return "$" + (v/1e6).toFixed(1) + "M";
+  if (a >= 1e3)  return "$" + (v/1e3).toFixed(0) + "K";
+  return "$" + v.toFixed(a < 10 ? 2 : 0);
+}
+function pct(v,d){ return (v*100).toFixed(d===undefined?1:d) + "%"; }
+
+/* ========== bet sizing ========== */
+function stake(){
+  var b = S.bankroll, k = Math.max(0, kelly()), s;
+  switch (S.mode) {
+    case "kelly":   s = b * k; break;
+    case "half":    s = b * k * 0.5; break;
+    case "quarter": s = b * k * 0.25; break;
+    case "dollar":  s = S.dollar; break;
+    case "martingale":
+      if (S.martStake === null) { S.martBase = b * S.frac; S.martStake = S.martBase; }
+      s = S.martStake; break;
+    default:        s = b * S.frac;
+  }
+  return Math.max(0, Math.min(s, b));
+}
+
+/* ========== one flip ========== */
+function flip(){
+  if (S.busted) return;
+  var risk = stake();
+  if (risk < 0.005) { markBust(); render(); return; }
+
+  var heads = Math.random() < S.p;
+  var won = (heads && S.side === "heads") || (!heads && S.side === "tails");
+  var before = S.bankroll;
+
+  S.bankroll += won ? risk * S.rr : -risk;
+  if (S.bankroll < 0) S.bankroll = 0;
+
+  S.flips++;
+  if (won) { S.wins++; S.streak = 0; } else { S.streak++; if (S.streak > S.worstStreak) S.worstStreak = S.streak; }
+
+  if (S.mode === "martingale") {
+    if (won) { S.martStake = S.martBase = S.bankroll * S.frac; }
+    else { S.martStake = Math.min(S.martStake * 2, S.bankroll); }
+  }
+
+  S.history.push(S.bankroll);
+  S.rets.push(before > 0 ? (S.bankroll - before) / before : 0);
+  var w = S.rets.slice(-20);
+  if (w.length >= 2) {
+    var m = w.reduce(function(a,x){return a+x;},0) / w.length;
+    var v = w.reduce(function(a,x){return a + (x-m)*(x-m);},0) / (w.length - 1);
+    S.vol.push(Math.sqrt(v));
+  } else S.vol.push(0);
+
+  if (S.bankroll > S.peak) S.peak = S.bankroll;
+  var dd = S.peak > 0 ? (S.peak - S.bankroll) / S.peak : 0;
+  if (dd > S.maxDD) S.maxDD = dd;
+
+  spinCoin(heads);
+  var msg = $("result");
+  msg.className = "result " + (won ? "win" : "lose");
+  msg.textContent = (heads ? "HEADS" : "TAILS") + " — you " + (won ? "won " + money(risk*S.rr) : "lost " + money(risk)) + ".";
+
+  if (S.bankroll < S.initial * RUIN_FRAC) markBust();
+  else if (!S.hitBillion && S.initial < BILLION && S.bankroll >= BILLION){
+    S.hitBillion = true; S.billionAt = S.flips; stop(); showSlip("billion");
+  }
+  render();
+}
+function markBust(){
+  S.busted = true; stop();
+  var msg = $("result");
+  msg.className = "result lose";
+  msg.textContent = "Wiped out at trade " + S.flips + ".";
+  showSlip("broke");
+}
+
+/* ========== end-of-run slip ========== */
+var BILLION = 1e9;
+function diagnose(kind){
+  var k = kelly(), f = currentFraction();
+  if (kind === "broke"){
+    if (k <= 0)
+      return "Your side had negative expectancy the whole way: every dollar risked lost " +
+             Math.abs(edge()).toFixed(3) + " on average. No sizing rule rescues a bet that shouldn't be taken.";
+    if (S.mode === "martingale")
+      return "Martingale doesn't beat the maths, it hides it. Each loss doubled the next stake until one streak " +
+             "was larger than the account. You survived " + S.worstStreak + " losses in a row — the account didn't.";
+    if (f > k * 2)
+      return "You risked " + pct(f) + " a trade against a Kelly of " + pct(k) + ". Past " + pct(Math.min(0.99,k*2)) +
+             " your compounding turns negative, so ruin stops being bad luck and becomes the expected outcome. " +
+             "The edge was real. The size was the problem.";
+    if (f > k)
+      return "You risked " + pct(f) + " against a Kelly of " + pct(k) + ". Still positive on paper, but overbetting " +
+             "this far trades a slower ruin for a faster one — and " + S.worstStreak + " losses in a row was enough.";
+    return "You were sized at or under Kelly, so this was variance rather than error. It still happens, which is " +
+           "exactly why most people who take Kelly seriously bet half of it.";
+  }
+  if (S.mode === "martingale")
+    return "You got here on martingale, which means you got here on luck. Run it again and the same settings " +
+           "will bust you far more often than they'll repeat this.";
+  if (f > k * 1.05)
+    return "Worth being honest: at " + pct(f) + " you were sized above Kelly's " + pct(k) + ". You outran the risk " +
+           "this time. Send the same run through the thousand-lifetime test and see how often that holds.";
+  if (f < k * 0.6)
+    return "You compounded at " + pct(f) + " against a Kelly of " + pct(k) + " — deliberately under-sized, slower " +
+           "on paper, and far harder to kill. That " + pct(S.maxDD) + " drawdown is what you paid for the ticket.";
+  return "Sized near Kelly at " + pct(f) + ", which is the fastest defensible way to compound an edge this size. " +
+         "The " + pct(S.maxDD) + " drawdown along the way is the part nobody puts in the screenshot.";
+}
+function showSlip(kind){
+  var ov = $("overlay"), slip = $("slip"), win = kind === "billion";
+  slip.classList.toggle("bust", !win);
+  $("ovTag").textContent = win ? "Milestone reached" : "Account closed";
+  $("ovDate").textContent = fmtDateFull(dateAt(S.flips));
+  $("ovTitle").textContent = win
+    ? "Congratulations — your edge and discipline made you a billionaire."
+    : "You're not responsible. You're broke.";
+  $("ovSub").textContent = win
+    ? "You turned " + money(S.initial) + " into ten figures in " + S.flips.toLocaleString() +
+      " trades across " + dayIndex(S.flips).toLocaleString() + " days."
+    : "You started with " + money(S.initial) + " and gave back everything after " + S.flips.toLocaleString() +
+      " trades across " + dayIndex(S.flips).toLocaleString() + " days.";
+
+  var rows = win
+    ? [["Final balance", compact(S.bankroll)],
+       ["Multiple on start", "×" + compactMult(S.bankroll / S.initial)],
+       ["Win rate", S.flips ? pct(S.wins/S.flips) : "—"],
+       ["Deepest drawdown", pct(S.maxDD)],
+       ["Worst losing streak", S.worstStreak + " trades"],
+       ["Growth per trade", pct(Math.exp(growth(currentFraction()))-1, 2)]]
+    : [["Peak balance", compact(S.peak)],
+       ["Fall from peak", "−" + pct(S.peak > 0 ? (S.peak-S.bankroll)/S.peak : 0)],
+       ["Win rate", S.flips ? pct(S.wins/S.flips) : "—"],
+       ["Trades survived", S.flips.toLocaleString()],
+       ["Worst losing streak", S.worstStreak + " trades"],
+       ["Risk per trade", pct(currentFraction())]];
+  $("ovNums").innerHTML = rows.map(function(r){
+    return '<div><div class="k">' + r[0] + '</div><div class="v">' + r[1] + '</div></div>';
+  }).join("");
+
+  $("ovNote").textContent = diagnose(kind);
+  $("ovContinue").style.display = win ? "" : "none";
+  ov.hidden = false;
+  (win ? $("ovContinue") : $("ovReset")).focus();
+}
+function hideSlip(){ $("overlay").hidden = true; }
+
+/* ========== coin animation ========== */
+var turns = 0;
+function spinCoin(heads){
+  turns += 4;
+  var el = $("coinInner");
+  el.style.transform = "rotateY(" + (turns * 180 + (heads ? 0 : 180)) + "deg)";
+}
+
+/* ========== auto play ========== */
+var raf = null, acc = 0, last = 0;
+function loop(ts){
+  if (!S.running) return;
+  if (!last) last = ts;
+  acc += (ts - last) / 1000; last = ts;
+  var due = Math.floor(acc * S.speed);
+  if (due > 0) {
+    acc -= due / S.speed;
+    for (var i = 0; i < Math.min(due, 200) && !S.busted; i++) flip();
+  }
+  raf = requestAnimationFrame(loop);
+}
+function start(){
+  if (S.busted) return;
+  S.running = true; last = 0; acc = 0;
+  $("playBtn").textContent = "Pause"; $("playBtn").classList.add("on");
+  raf = requestAnimationFrame(loop);
+}
+function stop(){
+  S.running = false;
+  if (raf) cancelAnimationFrame(raf);
+  $("playBtn").textContent = "Auto-flip"; $("playBtn").classList.remove("on");
+}
+function reset(){
+  stop();
+  S.bankroll = S.initial; S.history = [S.initial]; S.rets = []; S.vol = [];
+  S.flips = 0; S.wins = 0; S.peak = S.initial; S.maxDD = 0;
+  S.streak = 0; S.worstStreak = 0; S.busted = false;
+  S.hitBillion = false; S.billionAt = null;
+  hideSlip();
+  S.martStake = null; S.martBase = null;
+  var msg = $("result"); msg.className = "result idle"; msg.textContent = "Pick a side, size the bet, flip.";
+  render();
+}
+
+/* ========== canvas plumbing ========== */
+function prep(cv){
+  var dpr = window.devicePixelRatio || 1;
+  var r = cv.getBoundingClientRect();
+  var w = Math.max(1, Math.floor(r.width)), h = Math.max(1, Math.floor(r.height));
+  if (cv.width !== w*dpr || cv.height !== h*dpr) { cv.width = w*dpr; cv.height = h*dpr; }
+  var c = cv.getContext("2d");
+  c.setTransform(dpr,0,0,dpr,0,0);
+  c.clearRect(0,0,w,h);
+  return {c:c, w:w, h:h};
+}
+var C = { rule:"#1d2724", faint:"#465450", dim:"#6d7f79", up:"#46d19a", down:"#e0554b", warn:"#d9a441" };
+function axisText(c,t,x,y,align){
+  c.fillStyle = C.faint; c.font = "10px ui-monospace, monospace";
+  c.textAlign = align || "right"; c.textBaseline = "middle";
+  c.fillText(t,x,y);
+}
+
+/* ---- bankroll chart ---- */
+function drawBankroll(){
+  var g = prep($("bkChart")), c = g.c, W = g.w, H = g.h;
+  var L = 58, R = 8, T = 10, B = 20;
+  var d = S.history, n = d.length;
+  var lo, hi, tf;
+  if (S.logScale) {
+    tf = function(v){ return Math.log10(Math.max(v, S.initial*1e-4)); };
+  } else {
+    tf = function(v){ return v; };
+  }
+  lo = Infinity; hi = -Infinity;
+  for (var i=0;i<n;i++){ var v = tf(d[i]); if (v<lo) lo=v; if (v>hi) hi=v; }
+  var ruin = tf(S.initial * RUIN_FRAC);
+  if (ruin < lo) lo = ruin;
+  if (hi === lo) { hi = lo + 1; }
+  var pad = (hi-lo)*0.10; lo -= pad; hi += pad;
+
+  function X(i){ return L + (n<=1 ? 0 : (i/(n-1))*(W-L-R)); }
+  function Y(v){ return T + (1 - (tf(v)-lo)/(hi-lo)) * (H-T-B); }
+
+  for (var k=0;k<=4;k++){
+    var yy = T + (k/4)*(H-T-B);
+    c.strokeStyle = C.rule; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(L,yy+.5); c.lineTo(W-R,yy+.5); c.stroke();
+    var raw = lo + (1-k/4)*(hi-lo);
+    axisText(c, compact(S.logScale ? Math.pow(10,raw) : raw), L-8, yy);
+  }
+
+  // ruin line
+  var ry = Y(S.initial*RUIN_FRAC);
+  if (ry > T && ry < H-B) {
+    c.strokeStyle = "rgba(224,85,75,.55)"; c.setLineDash([3,4]); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(L,ry); c.lineTo(W-R,ry); c.stroke(); c.setLineDash([]);
+    axisText(c,"ruin",W-R-2,ry-8,"right");
+  }
+  // start line
+  var sy = Y(S.initial);
+  if (sy > T && sy < H-B) {
+    c.strokeStyle = "rgba(109,127,121,.4)"; c.setLineDash([2,4]);
+    c.beginPath(); c.moveTo(L,sy); c.lineTo(W-R,sy); c.stroke(); c.setLineDash([]);
+  }
+
+  if (n > 1) {
+    var up = S.bankroll >= S.initial;
+    var col = up ? C.up : C.down;
+    var grad = c.createLinearGradient(0,T,0,H-B);
+    grad.addColorStop(0, up ? "rgba(70,209,154,.22)" : "rgba(224,85,75,.22)");
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    c.beginPath(); c.moveTo(X(0),Y(d[0]));
+    for (var j=1;j<n;j++) c.lineTo(X(j),Y(d[j]));
+    c.lineTo(X(n-1),H-B); c.lineTo(X(0),H-B); c.closePath();
+    c.fillStyle = grad; c.fill();
+
+    c.beginPath(); c.moveTo(X(0),Y(d[0]));
+    for (var m=1;m<n;m++) c.lineTo(X(m),Y(d[m]));
+    c.strokeStyle = col; c.lineWidth = 1.4; c.lineJoin = "round"; c.stroke();
+
+    c.beginPath(); c.arc(X(n-1),Y(d[n-1]),3,0,Math.PI*2);
+    c.fillStyle = col; c.fill();
+
+    if (S.billionAt !== null && S.billionAt < n){
+      var bx = X(S.billionAt), by = Y(d[S.billionAt]);
+      c.strokeStyle = "rgba(217,164,65,.6)"; c.setLineDash([2,3]); c.lineWidth = 1;
+      c.beginPath(); c.moveTo(bx,by); c.lineTo(bx,H-B); c.stroke(); c.setLineDash([]);
+      c.beginPath(); c.arc(bx,by,3.5,0,Math.PI*2); c.fillStyle = C.warn; c.fill();
+      c.fillStyle = C.warn; c.font = "10px ui-monospace, monospace";
+      c.textAlign = bx > W-70 ? "right" : "left"; c.textBaseline = "bottom";
+      c.fillText(" $1B", bx, by-6);
+    }
+  }
+  dateAxis(c, L, R, W, H, B, n);
+}
+
+/* ---- shared date axis ---- */
+function dateAxis(c, L, R, W, H, B, n){
+  var longSpan = spanDays() > 120;
+  if (n <= 1){ axisText(c, fmtDate(S.start, longSpan), L, H-9, "left"); return; }
+  var ticks = Math.min(5, Math.max(2, Math.floor((W-L-R)/92)));
+  for (var t=0;t<ticks;t++){
+    var f = t/(ticks-1);
+    var x = L + f*(W-L-R);
+    var idx = Math.round(f*(n-1));
+    c.strokeStyle = "rgba(43,58,53,.9)"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x+.5, H-B); c.lineTo(x+.5, H-B+4); c.stroke();
+    axisText(c, fmtDate(dateAt(idx), longSpan), x, H-9,
+             t === 0 ? "left" : (t === ticks-1 ? "right" : "center"));
+  }
+}
+
+/* ---- volatility chart ---- */
+function drawVol(){
+  var g = prep($("volChart")), c = g.c, W = g.w, H = g.h;
+  var L = 58, R = 8, T = 8, B = 22;
+  var d = S.vol, n = d.length;
+  var hi = 0.05;
+  for (var i=0;i<n;i++) if (d[i] > hi) hi = d[i];
+  hi *= 1.15;
+  for (var k=0;k<=3;k++){
+    var yy = T + (k/3)*(H-T-B);
+    c.strokeStyle = C.rule; c.beginPath(); c.moveTo(L,yy+.5); c.lineTo(W-R,yy+.5); c.stroke();
+    axisText(c, pct(hi*(1-k/3),0), L-8, yy);
+  }
+  if (n > 1) {
+    c.beginPath();
+    for (var j=0;j<n;j++){
+      var x = L + (j/(n-1))*(W-L-R);
+      var y = T + (1 - d[j]/hi)*(H-T-B);
+      j ? c.lineTo(x,y) : c.moveTo(x,y);
+    }
+    c.strokeStyle = C.warn; c.lineWidth = 1.2; c.stroke();
+  }
+  dateAxis(c, L, R, W, H, B, n);
+}
+
+/* ---- signature: growth curve ---- */
+function drawCurve(){
+  var g = prep($("curveChart")), c = g.c, W = g.w, H = g.h;
+  var L = 58, R = 12, T = 14, B = 26;
+  var k = kelly(), N = 240;
+  var xs = [], ys = [], hi = -Infinity, lo = Infinity;
+  for (var i=0;i<=N;i++){
+    var f = (i/N) * 0.99;
+    var gr = f === 0 ? 0 : growth(f);
+    if (!isFinite(gr)) gr = -5;
+    xs.push(f); ys.push(gr);
+    if (gr > hi) hi = gr;
+    if (gr < lo) lo = gr;
+  }
+  // keep the interesting region readable: floor the downside
+  var floor = Math.min(-Math.max(hi, 0.005) * 4, -0.02);
+  if (lo < floor) lo = floor;
+  if (hi <= lo) hi = lo + 0.01;
+  var padY = (hi-lo)*0.12; hi += padY; lo -= padY;
+
+  function X(f){ return L + f/0.99 * (W-L-R); }
+  function Y(v){ return T + (1 - (Math.max(v,lo)-lo)/(hi-lo)) * (H-T-B); }
+
+  // grid + x labels
+  for (var q=0;q<=4;q++){
+    var yy = T + (q/4)*(H-T-B);
+    c.strokeStyle = C.rule; c.beginPath(); c.moveTo(L,yy+.5); c.lineTo(W-R,yy+.5); c.stroke();
+    var val = lo + (1-q/4)*(hi-lo);
+    axisText(c,(val>=0?"+":"") + (val*100).toFixed(1)+"%", L-8, yy);
+  }
+  for (var t=0;t<=5;t++){
+    var f = t/5*0.99;
+    axisText(c, (f*100).toFixed(0)+"%", X(f), H-10, "center");
+  }
+  // zero line
+  if (lo < 0 && hi > 0){
+    var zy = Y(0);
+    c.strokeStyle = "rgba(109,127,121,.55)"; c.setLineDash([2,3]);
+    c.beginPath(); c.moveTo(L,zy); c.lineTo(W-R,zy); c.stroke(); c.setLineDash([]);
+  }
+  // curve, split at zero
+  c.lineWidth = 1.6;
+  c.beginPath();
+  for (var a=0;a<xs.length;a++){ var x=X(xs[a]), y=Y(ys[a]); a?c.lineTo(x,y):c.moveTo(x,y); }
+  c.strokeStyle = C.dim; c.stroke();
+  // positive-growth segment highlighted
+  c.beginPath(); var started=false;
+  for (var b2=0;b2<xs.length;b2++){
+    if (ys[b2] > 0){ var x2=X(xs[b2]), y2=Y(ys[b2]); started?c.lineTo(x2,y2):(c.moveTo(x2,y2),started=true); }
+    else started=false;
+  }
+  c.strokeStyle = C.up; c.lineWidth = 2; c.stroke();
+
+  // Kelly peak
+  if (k > 0 && k < 1){
+    var kx = X(k), ky = Y(growth(k));
+    c.strokeStyle = "rgba(70,209,154,.5)"; c.setLineDash([2,3]); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(kx,ky); c.lineTo(kx,H-B); c.stroke(); c.setLineDash([]);
+    c.beginPath(); c.arc(kx,ky,3.5,0,Math.PI*2); c.fillStyle = C.up; c.fill();
+    c.fillStyle = C.up; c.font="10px ui-monospace, monospace"; c.textAlign="center"; c.textBaseline="bottom";
+    c.fillText("Kelly "+pct(k), kx, ky-7);
+    // ruin-neutral crossing (~2x Kelly)
+    var z = 0;
+    for (var s2=Math.ceil(k*N/0.99); s2<xs.length; s2++){ if (ys[s2] < 0){ z = xs[s2]; break; } }
+    if (z > 0){
+      var zx = X(z);
+      c.strokeStyle = "rgba(224,85,75,.45)"; c.setLineDash([2,3]);
+      c.beginPath(); c.moveTo(zx,T); c.lineTo(zx,H-B); c.stroke(); c.setLineDash([]);
+      c.fillStyle = C.down; c.textAlign = zx > W-100 ? "right" : "left"; c.textBaseline="top";
+      c.fillText(" growth turns negative " + pct(z), zx, T);
+    }
+  }
+  // your marker
+  var myF = Math.min(0.99, Math.max(0, currentFraction()));
+  var mx = X(myF), my = Y(growth(myF));
+  c.strokeStyle = C.ink || "#d6e2dd"; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(mx,T); c.lineTo(mx,H-B); c.stroke();
+  c.beginPath(); c.arc(mx,my,4,0,Math.PI*2); c.fillStyle="#d6e2dd"; c.fill();
+  c.fillStyle="#d6e2dd"; c.font="10px ui-monospace, monospace";
+  c.textAlign = mx > W-90 ? "right" : "left"; c.textBaseline="bottom";
+  c.fillText(" you " + pct(myF), mx, H-B-4);
+  axisText(c,"bet size as % of bankroll", W-R, H-10, "right");
+}
+function currentFraction(){
+  var k = Math.max(0, kelly());
+  switch(S.mode){
+    case "kelly": return k;
+    case "half": return k*0.5;
+    case "quarter": return k*0.25;
+    case "dollar": return S.bankroll > 0 ? Math.min(1, S.dollar/S.bankroll) : 0;
+    case "martingale": return S.bankroll > 0 ? Math.min(1, stake()/S.bankroll) : 0;
+    default: return S.frac;
+  }
+}
+
+/* ========== monte carlo ========== */
+var mcData = null;
+function runMC(){
+  var runs = Math.max(100, Math.min(20000, +$("mcRuns").value || 1000));
+  var flips = Math.max(10, Math.min(5000, +$("mcFlips").value || 300));
+  var ruinPct = Math.max(0.0001, (+$("mcRuin").value || 1) / 100);
+  var p = S.p, b = S.rr, side = S.side, k = Math.max(0, kelly());
+  var wp = side === "heads" ? p : 1 - p;
+  var mode = S.mode, baseFrac = S.frac, fixed = S.dollar;
+  var finals = [], bust = 0, ruinLine = S.initial * ruinPct;
+
+  for (var r=0;r<runs;r++){
+    var bal = S.initial, mart = null, dead = false;
+    for (var i=0;i<flips;i++){
+      var s;
+      if (mode === "kelly") s = bal*k;
+      else if (mode === "half") s = bal*k*0.5;
+      else if (mode === "quarter") s = bal*k*0.25;
+      else if (mode === "dollar") s = Math.min(fixed, bal);
+      else if (mode === "martingale"){ if (mart === null) mart = bal*baseFrac; s = Math.min(mart, bal); }
+      else s = bal*baseFrac;
+      if (s < 0.005){ dead = true; break; }
+      var won = Math.random() < wp;
+      bal += won ? s*b : -s;
+      if (bal < 0) bal = 0;
+      if (mode === "martingale") mart = won ? bal*baseFrac : Math.min(mart*2, bal);
+      if (bal < ruinLine){ dead = true; break; }
+    }
+    if (dead || bal < ruinLine) bust++;
+    finals.push(bal);
+  }
+  finals.sort(function(a,c2){return a-c2;});
+  var sum = finals.reduce(function(a,x){return a+x;},0);
+  function q(f){ return finals[Math.min(finals.length-1, Math.max(0, Math.floor(f*finals.length)))]; }
+  var below = 0; for (var z=0;z<finals.length;z++) if (finals[z] < S.initial) below++;
+
+  $("mcBust").textContent = (bust/runs*100).toFixed(1) + "%  (" + bust + "/" + runs + ")";
+  $("mcBust").style.color = bust/runs > 0.15 ? C.down : "";
+  $("mcLoss").textContent = (below/runs*100).toFixed(1) + "%";
+  $("mcMed").textContent = compact(q(0.5));
+  $("mcMean").textContent = compact(sum/runs);
+  $("mcP5").textContent = compact(q(0.05));
+  $("mcP95").textContent = compact(q(0.95));
+  $("mcMax").textContent = compact(finals[finals.length-1]);
+
+  mcData = { finals:finals, ruinLine:ruinLine, bust:bust, runs:runs };
+  drawMC();
+}
+function drawMC(){
+  var g = prep($("mcChart")), c = g.c, W = g.w, H = g.h;
+  if (!mcData){ axisText(c,"Run the simulation to see the spread of outcomes.", W/2, H/2, "center"); return; }
+  var L = 44, R = 10, T = 12, B = 24;
+  var f = mcData.finals, ruinLine = mcData.ruinLine;
+  var NB = 26, buckets = new Array(NB+1).fill(0);   // index 0 = busted
+  var minE = -1, maxE = 1;
+  for (var i=0;i<f.length;i++){
+    if (f[i] < ruinLine) continue;
+    var e = Math.log10(f[i]/S.initial);
+    if (e < minE) minE = e; if (e > maxE) maxE = e;
+  }
+  if (maxE <= minE) maxE = minE + 1;
+  for (var j=0;j<f.length;j++){
+    if (f[j] < ruinLine){ buckets[0]++; continue; }
+    var ee = Math.log10(f[j]/S.initial);
+    var idx = 1 + Math.min(NB-1, Math.floor((ee-minE)/(maxE-minE)*NB));
+    buckets[idx]++;
+  }
+  var hi = Math.max.apply(null, buckets) || 1;
+  var bw = (W-L-R)/(NB+1.6);
+  for (var k=0;k<buckets.length;k++){
+    var x = L + (k===0?0:k*bw + bw*0.6);
+    var h = (buckets[k]/hi)*(H-T-B);
+    c.fillStyle = k===0 ? "rgba(224,85,75,.75)" : (minE + ((k-1)+0.5)/NB*(maxE-minE) < 0 ? "rgba(217,164,65,.6)" : "rgba(70,209,154,.7)");
+    c.fillRect(x, H-B-h, bw*0.86, h);
+  }
+  c.strokeStyle = C.rule; c.beginPath(); c.moveTo(L,H-B+.5); c.lineTo(W-R,H-B+.5); c.stroke();
+  var gap = L + bw*1.3;
+  c.strokeStyle = "rgba(109,127,121,.45)"; c.setLineDash([2,3]);
+  c.beginPath(); c.moveTo(gap,T); c.lineTo(gap,H-B); c.stroke(); c.setLineDash([]);
+  axisText(c,"bust", L+bw*0.43, H-10, "center");
+  axisText(c, "×" + Math.pow(10,minE).toPrecision(2), L+bw*1.8, H-10, "left");
+  axisText(c, "×" + compactMult(Math.pow(10,maxE)), W-R, H-10, "right");
+  axisText(c, hi + " runs", L-6, T+4, "right");
+}
+function compactMult(v){
+  if (v >= 1e9) return (v/1e9).toFixed(1)+"B";
+  if (v >= 1e6) return (v/1e6).toFixed(1)+"M";
+  if (v >= 1e3) return (v/1e3).toFixed(1)+"K";
+  return v.toPrecision(3);
+}
+
+/* ========== render ========== */
+function render(){
+  var k = kelly(), e = edge(), myF = currentFraction(), gr = growth(myF);
+  var st = stake();
+
+  $("bankroll").textContent = money(S.bankroll);
+  $("bankroll").className = "v " + (S.bankroll >= S.initial ? "up" : "down");
+  $("riskAmt").textContent = money(st);
+  $("rewAmt").textContent = "+" + money(st * S.rr);
+  $("lossAmt").textContent = "−" + money(st);
+  var total = 1 + S.rr;
+  $("barRisk").style.width = (1/total*100) + "%";
+  $("barRew").style.width = (S.rr/total*100) + "%";
+  $("rrLabel").textContent = "Reward " + S.rr.toFixed(2);
+  $("rigTxt").textContent = pct(S.p);
+  $("tradeCount").textContent = S.flips;
+  $("throughDate").textContent = fmtDate(dateAt(S.flips), spanDays() > 120);
+  $("throughDate").title = fmtDateFull(dateAt(S.flips));
+
+  $("pwinCell").textContent = pct(pWin());
+  $("edgeCell").textContent = (e >= 0 ? "+" : "−") + "$" + Math.abs(e).toFixed(3);
+  $("edgeCell").style.color = e > 0 ? C.up : C.down;
+
+  if (k > 0){
+    $("kellyVal").textContent = pct(k);
+    $("kellyVal").style.color = C.up;
+    $("kellyCell").classList.remove("flag");
+  } else {
+    $("kellyVal").textContent = "No bet";
+    $("kellyVal").style.color = C.down;
+    $("kellyCell").classList.add("flag");
+  }
+  $("growthCell").textContent = isFinite(gr) ? ((gr>=0?"+":"") + (gr*100).toFixed(2) + "%") : "−100%";
+  $("growthCell").style.color = gr > 0 ? C.up : C.down;
+
+  var gDay = isFinite(gr) ? Math.exp(gr * S.tpd) - 1 : -1;
+  $("growthDayCell").textContent = !isFinite(gr) ? "−100%"
+      : (gDay > 99 ? "+" + compactMult(gDay) + "×"
+      : (gDay >= 0 ? "+" : "") + (gDay*100).toFixed(1) + "%");
+  $("growthDayCell").style.color = gDay > 0 ? C.up : C.down;
+
+  $("sFlips").textContent = S.flips;
+  $("sDays").textContent = dayIndex(S.flips);
+  $("sWin").textContent = S.flips ? pct(S.wins/S.flips) : "—";
+  $("sPeak").textContent = compact(S.peak);
+  $("sDD").textContent = pct(S.maxDD);
+  $("sStreak").textContent = S.worstStreak;
+  var ret = (S.bankroll - S.initial)/S.initial;
+  $("sRet").textContent = (ret>=0?"+":"") + (ret*100).toFixed(1) + "%";
+  $("sRet").style.color = ret >= 0 ? C.up : C.down;
+  $("sStatus").textContent = S.busted ? "Busted" : (S.running ? "Running" : "Live");
+  $("sStatus").style.color = S.busted ? C.down : "";
+
+  // curve note
+  var note;
+  if (k <= 0){
+    note = "At " + pct(pWin()) + " win odds paying " + S.rr.toFixed(2) + " to 1, every dollar risked loses " +
+           Math.abs(e).toFixed(3) + " on average. The curve never rises above zero — no bet size fixes a negative edge.";
+  } else {
+    note = "Kelly says risk " + pct(k) + " per flip. Bet more and the curve falls back down: past roughly " +
+           pct(Math.min(0.99, k*2)) + " you are compounding losses even though the edge is still in your favour. " +
+           "You are currently sized at " + pct(myF) + ".";
+  }
+  $("curveNote").textContent = note;
+
+  drawBankroll(); drawVol(); drawCurve();
+}
+
+/* ========== wiring ========== */
+function setSide(s){
+  S.side = s;
+  $("sideHeads").classList.toggle("on", s === "heads");
+  $("sideTails").classList.toggle("on", s === "tails");
+  render();
+}
+$("sideHeads").onclick = function(){ setSide("heads"); };
+$("sideTails").onclick = function(){ setSide("tails"); };
+$("flipBtn").onclick = function(){ flip(); };
+$("playBtn").onclick = function(){ S.running ? stop() : start(); render(); };
+$("resetBtn").onclick = reset;
+$("logBtn").onclick = function(){ S.logScale = !S.logScale; this.classList.toggle("on", S.logScale); drawBankroll(); };
+
+function link(rangeId, numId, apply, scale){
+  var r = $(rangeId), n = $(numId);
+  function fromR(){ n.value = r.value; apply(+r.value / (scale||1)); }
+  function fromN(){ var v = +n.value; if (isNaN(v)) return; r.value = v; apply(v / (scale||1)); }
+  r.addEventListener("input", fromR);
+  n.addEventListener("input", fromN);
+}
+link("fracRange","fracNum", function(v){ S.frac = Math.max(0, Math.min(1, v)); S.martStake = null; render(); }, 100);
+link("rigRange","rigNum", function(v){ S.p = Math.max(0, Math.min(1, v)); render(); }, 100);
+link("rrRange","rrNum", function(v){ S.rr = Math.max(0.01, v); render(); }, 1);
+
+$("dollarNum").addEventListener("input", function(){ S.dollar = Math.max(0.01, +this.value || 0.01); render(); });
+
+$("initNum").addEventListener("change", function(){
+  var v = Math.max(1, +this.value || 1);
+  this.value = v; S.initial = v; mcData = null; reset(); drawMC();
+});
+$("tpdNum").addEventListener("input", function(){
+  S.tpd = Math.max(0.1, Math.min(500, +this.value || 10));
+  $("mcDays").textContent = "= " + Math.max(1, Math.round((+$("mcFlips").value || 300) / S.tpd)) + " days";
+  render();
+});
+$("startDate").addEventListener("change", function(){
+  var parts = this.value.split("-");
+  if (parts.length === 3){ S.start = new Date(+parts[0], +parts[1]-1, +parts[2]); render(); }
+});
+$("mcFlips").addEventListener("input", function(){
+  $("mcDays").textContent = "= " + Math.max(1, Math.round((+this.value || 300) / S.tpd)) + " days";
+});
+$("speedRange").addEventListener("input", function(){ S.speed = +this.value; $("speedTxt").textContent = S.speed + "/s"; });
+$("modeSel").addEventListener("change", function(){
+  S.mode = this.value;
+  S.martStake = null;
+  $("fracField").style.display = (S.mode === "fraction" || S.mode === "martingale") ? "flex" : "none";
+  $("dollarField").style.display = S.mode === "dollar" ? "flex" : "none";
+  render();
+});
+$("mcBtn").onclick = function(){
+  this.textContent = "Running…"; this.disabled = true;
+  var btn = this;
+  setTimeout(function(){ runMC(); btn.textContent = "Run simulation"; btn.disabled = false; }, 20);
+};
+
+/* presets */
+var PRESETS = {
+  study:    { p:0.60, rr:1,   side:"heads", frac:0.20, mode:"fraction", init:25,   tpd:10 },
+  longshot: { p:0.30, rr:4,   side:"heads", frac:0.10, mode:"fraction", init:1000, tpd:3  },
+  grind:    { p:0.78, rr:0.4, side:"heads", frac:0.15, mode:"fraction", init:1000, tpd:25 }
+};
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(b){
+  b.onclick = function(){
+    var q = PRESETS[b.getAttribute("data-preset")];
+    S.p = q.p; S.rr = q.rr; S.frac = q.frac; S.mode = q.mode; S.initial = q.init; S.tpd = q.tpd;
+    $("rigRange").value = $("rigNum").value = (q.p*100).toFixed(1);
+    $("rrRange").value = $("rrNum").value = q.rr;
+    $("fracRange").value = $("fracNum").value = (q.frac*100).toFixed(1);
+    $("initNum").value = q.init;
+    $("tpdNum").value = q.tpd;
+    $("mcDays").textContent = "= " + Math.max(1, Math.round((+$("mcFlips").value || 300) / S.tpd)) + " days";
+    $("modeSel").value = q.mode;
+    $("fracField").style.display = "flex"; $("dollarField").style.display = "none";
+    setSide(q.side);
+    mcData = null;
+    reset();
+    Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(x){ x.classList.remove("on"); });
+    b.classList.add("on");
+  };
+});
+
+$("ovContinue").onclick = function(){ hideSlip(); $("flipBtn").focus(); };
+$("ovReset").onclick = function(){ reset(); $("flipBtn").focus(); };
+$("overlay").addEventListener("click", function(e){ if (e.target === this && !S.busted) hideSlip(); });
+
+/* keyboard */
+document.addEventListener("keydown", function(e){
+  if (!$("overlay").hidden){
+    if (e.key === "Escape" && !S.busted){ e.preventDefault(); hideSlip(); }
+    return;
+  }
+  var tag = (e.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "select") return;
+  if (e.code === "Space"){ e.preventDefault(); flip(); }
+  else if (e.code === "Enter"){ e.preventDefault(); S.running ? stop() : start(); render(); }
+  else if (e.key === "h" || e.key === "H") setSide("heads");
+  else if (e.key === "t" || e.key === "T") setSide("tails");
+});
+
+window.addEventListener("resize", function(){ render(); drawMC(); });
+
+/* boot */
+$("startDate").value = toInputDate(S.start);
+$("initNum").value = S.initial;
+$("tpdNum").value = S.tpd;
+$("mcDays").textContent = "= " + Math.round(300 / S.tpd) + " days";
+render(); drawMC();
+})();
+</script>
+</body>
+</html>
